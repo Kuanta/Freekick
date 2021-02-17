@@ -4,6 +4,10 @@ using UnityEngine;
 
 public class Ball : MonoBehaviour
 {
+
+    //Public Scipts
+    Goalee goaleeScript;
+    public GameObject goaleeObject;
     // Start is called before the first frame update
     public float maxVerticalAngle = 60.0f;
   
@@ -38,12 +42,17 @@ public class Ball : MonoBehaviour
         this.mousePoints = new List<Vector3>();
         this.insideCollider = this.GetComponents<SphereCollider>()[0];
         this.outsideCollider = this.GetComponents<SphereCollider>()[1];
+
+        if(this.goaleeObject != null)
+        {
+            this.goaleeScript = this.goaleeObject.GetComponent<Goalee>();
+            this.goaleeScript.GoalEvent += this.OnGoalEvent;
+        }
     }
 
     // Update is called once per frame
     void Update()
     {
-
         if(Input.GetMouseButtonDown(0))
         {
             if(!this.pressed)
@@ -153,6 +162,10 @@ public class Ball : MonoBehaviour
             result = new Vector3(999, 999, 999);
             return false;
         }
+    }
+    void OnGoalEvent(object source)
+    {
+        this.resetBall();
     }
     void kickBall(float forceMag, float verticalAngle, float horizontalAngle, float curveAngle)
     {
