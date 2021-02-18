@@ -8,24 +8,38 @@ public class Ball : MonoBehaviour
     //Public Scipts
     Goalee goaleeScript;
     public GameObject goaleeObject;
-    // Start is called before the first frame update
+
+    // HyperParams
+    Vector2 relCenterPos;  //A normalized vector representing the balls position relative to the screen. For x=0.5 it means that the ball is roughly at the center and y=1/3 means
+    //that ball's height is 1/3 of the screen's height. When kicking the ball, curve and vertical angles will be decided by comparing the pressed positions to this vector
+
     public float maxVerticalAngle = 60.0f;
   
-    public float curveAngle = 25.0f; //Between -90 and 90. This angle will curve the ball
-    public float curveFactor = 10.0f;
+    //Between -90 and 90. This angle will curve the ball
+    public float curveFactor = 60.0f;
+    public float horizontalAngleFactor = 60.0f;
     public Rigidbody rb;
-    public float maxForce = 500.0f;
+    public float maxForce = 5.0f;
     public float timeToForce;
     private Vector3 pressPos, releasePos;
     public float pressTime, releaseTime;
     public bool kicked = false; //Player can't kick the ball while its already been kicked
-    private bool pressed = false; //Will be set to true when player starts kicking 
-    private float verticalAngle;
-    private float horizontalAngle;  //0deg is straight to kale. Between -90 and 90
+    public bool pressed = false; //Will be set to true when player starts kicking 
+
     private List<Vector3> mousePoints;
     private Vector3 lastPressPos;
     private float lastPressTime;
     private float pointSaveFreq = 0.1f;
+
+    //Movement variables (Public because other scripts might need these)
+    [SerializeField]
+    public float verticalAngle = 0.0f;
+    [SerializeField]
+    public float horizontalAngle = 0.0f;  //0deg is straight to kale. Between -90 and 90
+    [SerializeField]
+    public float kickForce = 0.0f;
+    [SerializeField]
+    public float curveAngle = 0.0f;
 
     private SphereCollider insideCollider;
     private SphereCollider outsideCollider; //This one aims to provide a bigger collider than the object, since it can be difficult to hit the ball when actual collider is too small
@@ -36,6 +50,7 @@ public class Ball : MonoBehaviour
 
     void Start()
     {
+        this.relCenterPos = new Vector2(0.5f, 1.0f / 3.0f);
         this.rb = (Rigidbody)this.GetComponent<Rigidbody>();
         this.kicked = false;
         this.timeToForce = 0.1f;
@@ -67,34 +82,38 @@ public class Ball : MonoBehaviour
         }
         else if(Input.GetMouseButtonUp(0))
         {
-            if(!this.kicked && this.pressed && this.mousePoints.Count > 1)  //Have at least two points
+            if(!this.kicked)  //Have at least two points
             {
 
-                /*
-                 * Angle diff between the last and the first forceVec can be the curvature angle
-                 */
-                float minX = this.mousePoints[0].x;
-                float maxX = this.mousePoints[0].x;
-                float totalMag = 0;
-                for(int i =1;i<this.mousePoints.Count;i++)
-                {
-                    Vector3 _diff = this.mousePoints[i] - this.mousePoints[i - 1];
-                    totalMag += _diff.magnitude;
-                }
+                ///*
+                // * Angle diff between the last and the first forceVec can be the curvature angle
+                // */
+                //float minX = this.mousePoints[0].x;
+                //float maxX = this.mousePoints[0].x;
+                //float totalMag = 0;
+                //for(int i =1;i<this.mousePoints.Count;i++)
+                //{
+                //    Vector3 _diff = this.mousePoints[i] - this.mousePoints[i - 1];
+                //    totalMag += _diff.magnitude;
+                //}
 
-                // Calculate force vector params
-                this.releasePos = Input.mousePosition;
-                this.verticalAngle = (Screen.height * 1.0f/3.0f - Mathf.Clamp(this.pressPos.y, 0, Screen.height * 1.0f / 3.0f)) / (Screen.height * 1.0f / 3.0f) *this.maxVerticalAngle;
-                Vector3 diffVec = this.releasePos - this.pressPos;
-                float forceAmount = Mathf.Clamp(totalMag, 0.0f, maxForce)*timeToForce;
-                this.horizontalAngle = Mathf.Atan(diffVec.x / diffVec.y);
+                //Vector3 diffTotal = this.mousePoints[this.mousePoints.Count - 1] - this.mousePoints[0];
 
-                // Curve
-                this.curveAngle = -1*(this.pressPos.x - Screen.width/2.0f)/(Screen.width*0.5f)*90.0f;
-                this.kicked = true;
+                //// Calculate force vector params
+                //this.releasePos = Input.mousePosition;
+                //this.verticalAngle = (Screen.height * 1.0f/3.0f - Mathf.Clamp(this.pressPos.y, 0, Screen.height * 1.0f / 3.0f)) / (Screen.height * 1.0f / 3.0f) *this.maxVerticalAngle;
+                //Vector3 diffVec = this.releasePos - this.pressPos;
+                //float forceAmount = Mathf.Clamp(totalMag, 0.0f, maxForce)*timeToForce;
+                //this.horizontalAngle = Mathf.Atan(diffVec.x / diffVec.y);
+
+                //// Curve
+                //Debug.Log(this.mousePoints.Count);
+                //this.curveAngle = -1*(this.pressPos.x - Screen.width/2.0f)/(Screen.width*0.5f)*90.0f;
+                //this.kicked = true;
+                //this.pressed = false;
                 this.pressed = false;
-
-                this.kickBall(forceAmount, verticalAngle, horizontalAngle, curveAngle);
+                this.kicked = true;
+                this.kickBall(this.kickForce, this.verticalAngle, this.horizontalAngle, this.curveAngle);
 
             }
             else
@@ -109,16 +128,31 @@ public class Ball : MonoBehaviour
             ResetEvent();
         }
 
-        //Save force vectors
-        if(this.pressed && this.mousePoints.Count <= 10)
+        ////Save force vectors
+        //if(this.pressed && this.mousePoints.Count <= 10)
+        //{
+        //    float currTime = Time.time;
+        //    if((currTime - this.lastPressTime)%this.pointSaveFreq == 0)
+        //    {
+        //        Vector3 currPos = Input.mousePosition;
+        //        this.mousePoints.Add(currPos);
+        //        this.lastPressPos = currPos;
+        //    }
+        //}
+
+        if(this.pressed)
         {
-            float currTime = Time.time;
-            if((currTime - this.lastPressTime)%this.pointSaveFreq == 0)
-            {
-                Vector3 currPos = Input.mousePosition;
-                this.mousePoints.Add(currPos);
-                this.lastPressPos = currPos;
-            }
+            //Get current position
+            float centerX = Screen.width * this.relCenterPos.x;
+            float centerY = Screen.height * this.relCenterPos.y;
+            Vector3 currPos = Input.mousePosition;
+            this.curveAngle = (this.pressPos.x - centerX) / centerX * curveFactor;
+            this.verticalAngle = (this.pressPos.y - centerY) / centerY * horizontalAngleFactor;
+            Vector3 diffVec = this.pressPos - currPos;
+            this.horizontalAngle = Mathf.Atan2(diffVec.y, diffVec.x) * Mathf.Rad2Deg;
+            this.kickForce = Mathf.Abs(diffVec.y) / (Screen.height * 0.5f); //Different devices have different heights. A different vector that traverses half of the screen should mean max force
+            this.kickForce = Mathf.Max(this.kickForce, 1.0f); // Clamp with 1 since this must be a normalized value
+            this.kickForce = this.kickForce * this.maxForce;
         }
     }
     void FixedUpdate()
@@ -128,6 +162,8 @@ public class Ball : MonoBehaviour
          * i) velMag
          * ii) curveAngle
          */
+
+        //This is for giving curve effect to the ball
         float velMag = this.rb.velocity.magnitude;
         if(this.kicked && this.rb.velocity.y >= 0.01f)
         {
@@ -157,8 +193,6 @@ public class Ball : MonoBehaviour
         }
         else
         {
-            Debug.DrawRay(ray.origin, ray.direction*1000.0f, Color.red);
-            Debug.Log(ray.direction);
             result = new Vector3(999, 999, 999);
             return false;
         }
@@ -167,11 +201,16 @@ public class Ball : MonoBehaviour
     {
         this.resetBall();
     }
+    public Vector3 getForceDir()
+    {
+        return new Vector3(-1 * Mathf.Cos(horizontalAngle * Mathf.Deg2Rad), Mathf.Sin(verticalAngle * Mathf.Deg2Rad), -1 * Mathf.Sin(horizontalAngle * Mathf.Deg2Rad)).normalized;
+    }
     void kickBall(float forceMag, float verticalAngle, float horizontalAngle, float curveAngle)
     {
 
         //Vector3 forceVec = new Vector3(diffVec.x, );
-        Vector3 forceVec = new Vector3(-1 * Mathf.Sin(this.horizontalAngle), Mathf.Sin(this.verticalAngle * Mathf.Deg2Rad), -1 * Mathf.Cos(this.horizontalAngle));
+        Debug.Log(horizontalAngle);
+        Vector3 forceVec = this.getForceDir();
         this.rb.AddForce(forceVec.normalized * forceMag, ForceMode.Impulse);
         this.kicked = true;
     }
